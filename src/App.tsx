@@ -8,7 +8,7 @@ import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'mot
 import { 
   Menu, X, ArrowRight, ShieldCheck, Zap, Layers, 
   MapPin, TreePine, Building2, 
-  Wind, Droplets, Ruler, CheckCircle2,
+  Wind, Droplets, Ruler, CheckCircle2, Lock,
   Instagram, Linkedin, Pin
 } from 'lucide-react';
 
@@ -433,78 +433,497 @@ const ModuleItem = ({ module, onVisible }: any) => {
   );
 };
 
-const ConfiguratorTeaser = () => {
+const Configurator = () => {
+  const [step, setStep] = useState(1);
+  const [selections, setSelections] = useState({
+    modules: {
+      entrance: true,
+      bathroom: true,
+      kitchen: true,
+      loft: false,
+      deck: false
+    },
+    finish: 'warm',
+    addons: {
+      solar: false,
+      greywater: false,
+      heatpump: false,
+      glazing: false
+    }
+  });
+
+  const [quoteInfo, setQuoteInfo] = useState({ email: '', country: 'Belgium' });
+  const [submitted, setSubmitted] = useState(false);
+  const [priceFlash, setPriceFlash] = useState(false);
+  const shouldReduceMotion = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+
+  const MODULE_DATA = [
+    { id: 'entrance', name: "Entrance & Technical", desc: "Door, stairs, utility connections", price: 8500, required: true },
+    { id: 'bathroom', name: "Bathroom", desc: "Self-contained wet room with shower, WC, basin", price: 6500, required: true },
+    { id: 'kitchen', name: "Kitchen & Living", desc: "Galley kitchen and multifunctional living zone", price: 9000, required: true },
+    { id: 'loft', name: "Sleeping Loft", desc: "Double bed under tapered ceiling with skylight", price: 6500, required: false },
+    { id: 'deck', name: "Rooftop Deck", desc: "Outdoor platform with stainless rails at the apex", price: 4500, required: false },
+  ];
+
+  const FINISH_DATA = [
+    { id: 'warm', name: "Warm Natural", desc: "Exposed oiled CLT walls, oak flooring, microcement bath", price: 0, color: '#F5E6D3', gradient: 'from-[#F5E6D3] to-[#EBE0D0]' },
+    { id: 'white', name: "White Studio", desc: "White-painted CLT, light oak, polished concrete", price: 1800, color: '#F9F9F9', gradient: 'from-[#F9F9F9] to-[#F1F1F1]' },
+    { id: 'dark', name: "Dark Contrast", desc: "Smoked CLT, blackened oak, charcoal microcement", price: 2400, color: '#3A3A3A', gradient: 'from-[#3A3A3A] to-[#2D2D2D]' },
+  ];
+
+  const ADDON_DATA = [
+    { id: 'solar', name: "Solar pack", desc: "4×400W panels + 5kWh battery", price: 8500 },
+    { id: 'greywater', name: "Greywater recycling", desc: "Reduces freshwater demand by ~40%", price: 2200 },
+    { id: 'heatpump', name: "Heat pump", desc: "Heating and cooling, A++ rated", price: 3800 },
+    { id: 'glazing', name: "Premium triple-glazing", desc: "Acoustic + thermal upgrade", price: 1600 },
+  ];
+
+  const total = useMemo(() => {
+    let sum = 0;
+    MODULE_DATA.forEach(m => { if (selections.modules[m.id as keyof typeof selections.modules]) sum += m.price; });
+    const finish = FINISH_DATA.find(f => f.id === selections.finish);
+    if (finish) sum += finish.price;
+    ADDON_DATA.forEach(a => { if (selections.addons[a.id as keyof typeof selections.addons]) sum += a.price; });
+    return sum;
+  }, [selections]);
+
+  useEffect(() => {
+    setPriceFlash(true);
+    const timer = setTimeout(() => setPriceFlash(false), 200);
+    return () => clearTimeout(timer);
+  }, [total]);
+
+  const range = { min: total * 0.9, max: total * 1.1 };
+  const moduleCount = Object.values(selections.modules).filter(Boolean).length;
+  const height = (moduleCount * 1.2).toFixed(1);
+
+  const toggleModule = (id: string) => {
+    const mod = MODULE_DATA.find(m => m.id === id);
+    if (mod?.required) return;
+    setSelections(prev => ({
+      ...prev,
+      modules: { ...prev.modules, [id]: !prev.modules[id as keyof typeof prev.modules] }
+    }));
+  };
+
+  const toggleAddon = (id: string) => {
+    setSelections(prev => ({
+      ...prev,
+      addons: { ...prev.addons, [id]: !prev.addons[id as keyof typeof prev.addons] }
+    }));
+  };
+
+  const handleQuoteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Configuration Captured:", selections);
+    console.log("Contact Info:", quoteInfo);
+    setSubmitted(true);
+  };
+
+  const steps = [
+    { n: 1, name: "Modules" },
+    { n: 2, name: "Finish" },
+    { n: 3, name: "Add-ons" },
+    { n: 4, name: "Quote" }
+  ];
+
   return (
-    <section id="configurator" className="relative py-24 md:py-48 bg-surface text-center overflow-hidden">
-      {/* Background Motif */}
-      <div className="absolute right-[2%] top-1/2 -translate-y-1/2 rotate-90 hidden xl:block">
-        <span className="text-[120px] font-serif font-light text-timber opacity-[0.03] tracking-[0.3em] whitespace-nowrap">
-          CONFIGURATOR
-        </span>
-      </div>
+    <section id="configurator" className="relative py-24 md:py-32 bg-cream overflow-hidden">
+      <div className="container mx-auto px-6 max-w-[1400px]">
+        <div className="flex flex-col lg:flex-row gap-12 lg:gap-20">
+          
+          {/* Left: Preview Area */}
+          <div className="lg:w-[60%] flex flex-col justify-center items-center bg-surface border border-charcoal/5 rounded-3xl p-12 min-h-[500px] lg:min-h-[700px] relative">
+            <Reveal className="w-full flex flex-col items-center">
+              <motion.div
+                animate={shouldReduceMotion ? {} : {
+                  rotateY: [0, 4, 0, -4, 0],
+                  y: [0, -5, 0, -5, 0]
+                }}
+                transition={{
+                  duration: 6,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                style={{ perspective: 1000 }}
+                className="relative"
+              >
+                <svg width="340" height="540" viewBox="0 0 340 540" fill="none" className="drop-shadow-2xl">
+                  {/* Ground/Platform */}
+                  <rect x="40" y="510" width="260" height="2" fill="#2D1F12" fillOpacity="0.1" />
+                  <rect x="100" y="510" width="2" height="15" fill="#2D1F12" opacity="0.4" />
+                  <rect x="238" y="510" width="2" height="15" fill="#2D1F12" opacity="0.4" />
+                  
+                  {/* Modules - Render from bottom to top */}
+                  {MODULE_DATA.map((m, i) => {
+                    const isIncluded = selections.modules[m.id as keyof typeof selections.modules];
+                    const finishColor = FINISH_DATA.find(f => f.id === selections.finish)?.color;
+                    const y = 430 - (i * 90);
+                    const taperScale = 1 - (i * 0.08);
+                    const width = 200 * taperScale;
+                    const nextWidth = 200 * (1 - ((i+1) * 0.08));
+                    
+                    return (
+                      <g key={m.id} id={`module-${m.id}`} className="transition-all duration-700">
+                        <path 
+                          d={`M${170-width/2} ${y+80} L${170+width/2} ${y+80} L${170+nextWidth/2} ${y} L${170-nextWidth/2} ${y} Z`}
+                          fill={isIncluded ? "#FAF8F4" : "none"}
+                          stroke="#2D1F12"
+                          strokeWidth="1.5"
+                          strokeOpacity={isIncluded ? 1 : 0.15}
+                          strokeDasharray={isIncluded ? "none" : "4 4"}
+                        />
+                        {/* Internal tint through window */}
+                        {isIncluded && (
+                          <rect 
+                            x={170-width/4} 
+                            y={y+30} 
+                            width={width/2} 
+                            height="30" 
+                            fill={finishColor} 
+                            fillOpacity="0.8"
+                            stroke="#2D1F12"
+                            strokeWidth="0.5"
+                          />
+                        )}
+                        {isIncluded && (
+                          <text x="300" y={y+45} fill="#2D1F12" opacity="0.4" fontSize="9" letterSpacing="2" className="hidden md:block">0{i+1} {m.id.toUpperCase()}</text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </motion.div>
 
-      <div className="container mx-auto px-6 max-w-4xl relative z-10">
-        <SectionEyebrow bordered>Build yours</SectionEyebrow>
-        <h2 className="text-5xl md:text-[80px] font-serif font-light tracking-tight-serif text-charcoal mb-10 leading-[1]">
-          Design your Obelisk <br className="hidden md:block" /> in the browser.
-        </h2>
-        <p className="text-muted text-lg mb-16 max-w-2xl mx-auto">
-          Select your modules, refine the interior finish, and calculate your off-grid requirements. Preview your build in real-time.
-        </p>
+              <div className="mt-12 flex space-x-12 text-[10px] uppercase tracking-[0.2em] font-bold text-muted">
+                <div className="flex flex-col items-center">
+                  <span className="text-charcoal mb-1">{height}m</span>
+                  <span>Height</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-charcoal mb-1">4×5m</span>
+                  <span>Footprint</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-charcoal mb-1">{moduleCount}/5</span>
+                  <span>Modules</span>
+                </div>
+              </div>
+            </Reveal>
+          </div>
 
-        <Reveal delay={0.2} className="relative bg-cream border border-charcoal/10 rounded-2xl overflow-hidden shadow-sm flex flex-col md:flex-row text-left">
-          {/* Left panel */}
-          <div className="md:w-80 bg-surface border-b md:border-b-0 md:border-r border-charcoal/10 p-8">
-            <h4 className="font-serif text-lg mb-6">Configuration</h4>
-            <div className="space-y-6">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-muted font-bold mb-3">Modules</p>
-                <div className="p-3 bg-cream border border-timber text-timber rounded text-xs font-semibold flex justify-between items-center">
-                  <span>4 Modules (Standard)</span>
-                  <ArrowRight className="w-3 h-3" />
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-muted font-bold mb-3">Interior Finish</p>
-                <div className="p-3 border border-charcoal/10 text-muted rounded text-xs flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-wood rounded-full mr-2" />
-                    <span>Hokkaido Oak</span>
-                  </div>
-                  <ArrowRight className="w-3 h-3 opacity-30" />
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-widest text-muted font-bold mb-3">Power Package</p>
-                <div className="p-3 border border-charcoal/10 text-muted rounded text-xs flex items-center justify-between">
-                  <span>Off-grid Solar Pack</span>
-                  <div className="w-7 h-4 bg-charcoal/5 rounded-full" />
-                </div>
-              </div>
+          {/* Right: Controls Area */}
+          <div className="lg:w-[40%] flex flex-col">
+            {/* Step Indicator */}
+            <div className="flex items-center justify-between mb-12 overflow-x-auto pb-4 no-scrollbar">
+              {steps.map((s, i) => (
+                <React.Fragment key={s.n}>
+                  <button 
+                    onClick={() => setStep(s.n)}
+                    className="flex flex-col items-center group relative z-10"
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                      step === s.n ? 'bg-amber text-cream ring-4 ring-amber/10' : 
+                      step > s.n ? 'bg-timber text-cream' : 
+                      'bg-surface border border-charcoal/10 text-muted'
+                    }`}>
+                      {step > s.n ? '✓' : s.n}
+                    </div>
+                    <span className={`text-[9px] uppercase tracking-widest mt-3 whitespace-nowrap font-bold ${
+                      step === s.n ? 'text-charcoal' : 'text-muted'
+                    }`}>{s.name}</span>
+                  </button>
+                  {i < steps.length - 1 && (
+                    <div className={`flex-grow h-px mx-2 min-w-[20px] ${step > s.n ? 'bg-amber' : 'bg-charcoal/10'}`} />
+                  )}
+                </React.Fragment>
+              ))}
             </div>
-          </div>
 
-          {/* Right panel */}
-          <div className="flex-grow p-12 bg-cream flex flex-col items-center justify-center min-h-[400px]">
-             <div className="w-48 h-72 border-2 border-dashed border-charcoal/10 rounded-lg flex items-center justify-center relative">
-                <ObeliskSVG />
-                <div className="absolute inset-x-0 -bottom-16 text-center">
-                  <p className="text-[10px] uppercase tracking-widest text-muted font-bold mb-1">Estimated Price</p>
-                  <p className="font-serif text-2xl text-charcoal">€34,500</p>
+            {/* Step Content */}
+            <div className="flex-grow min-h-[400px]">
+              <AnimatePresence mode="wait">
+                {step === 1 && (
+                  <motion.div 
+                    key="step1"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-6"
+                  >
+                    <div>
+                      <h3 className="text-2xl font-serif text-charcoal mb-2">Choose your modules</h3>
+                      <p className="text-muted text-sm">Each module is a self-contained unit. Stack them to fit your life.</p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {MODULE_DATA.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => toggleModule(m.id)}
+                          className={`w-full text-left p-5 border transition-all relative ${
+                            selections.modules[m.id as keyof typeof selections.modules] 
+                            ? 'border-timber bg-surface ring-1 ring-timber/5' 
+                            : 'border-charcoal/10 hover:border-charcoal/30'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="text-sm font-bold text-charcoal uppercase tracking-wider">{m.name}</h4>
+                                {m.required && (
+                                  <div className="flex items-center gap-1 bg-charcoal text-cream px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    <span className="text-[9px]">Required</span>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted leading-relaxed max-w-[250px]">{m.desc}</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-serif text-timber">€{m.price.toLocaleString()}</div>
+                              {selections.modules[m.id as keyof typeof selections.modules] && (
+                                <div className="mt-2 text-amber">
+                                  <CheckCircle2 className="w-4 h-4 ml-auto" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {selections.modules[m.id as keyof typeof selections.modules] && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => setStep(2)}
+                      className="w-full py-5 bg-timber text-cream text-[11px] font-bold uppercase tracking-widest hover:bg-charcoal transition-all mt-8"
+                    >
+                      Continue to finish →
+                    </button>
+                  </motion.div>
+                )}
+
+                {step === 2 && (
+                  <motion.div 
+                    key="step2"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-8"
+                  >
+                    <div>
+                      <h3 className="text-2xl font-serif text-charcoal mb-2">Interior finish</h3>
+                      <p className="text-muted text-sm">All three finishes use real materials. Pick what feels like home.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {FINISH_DATA.map(f => (
+                        <button
+                          key={f.id}
+                          onClick={() => setSelections(prev => ({ ...prev, finish: f.id }))}
+                          className={`w-full flex items-stretch border transition-all overflow-hidden ${
+                            selections.finish === f.id ? 'border-timber ring-1 ring-timber/5' : 'border-charcoal/10'
+                          }`}
+                        >
+                          <div className={`w-1/3 bg-gradient-to-br ${f.gradient}`} />
+                          <div className="w-2/3 p-5 text-left bg-cream relative">
+                            <h4 className="text-sm font-bold text-charcoal uppercase tracking-wider mb-1">{f.name}</h4>
+                            <p className="text-[11px] text-muted leading-tight">{f.desc}</p>
+                            <div className="mt-2 text-sm font-serif text-timber">
+                              {f.price > 0 ? `+€${f.price.toLocaleString()}` : 'Included'}
+                            </div>
+                            {selections.finish === f.id && (
+                              <CheckCircle2 className="absolute top-4 right-4 w-4 h-4 text-amber" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => setStep(3)}
+                      className="w-full py-5 bg-timber text-cream text-[11px] font-bold uppercase tracking-widest hover:bg-charcoal transition-all"
+                    >
+                      Continue to add-ons →
+                    </button>
+                  </motion.div>
+                )}
+
+                {step === 3 && (
+                  <motion.div 
+                    key="step3"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-8"
+                  >
+                    <div>
+                      <h3 className="text-2xl font-serif text-charcoal mb-2">Power, water, comfort</h3>
+                      <p className="text-muted text-sm">Optional. All can be retrofitted later, but this is the cheapest moment to add them.</p>
+                    </div>
+
+                    <div className="divide-y divide-charcoal/10 border-y border-charcoal/10">
+                      {ADDON_DATA.map(a => (
+                        <div key={a.id} className="py-5 flex items-center justify-between">
+                          <div className="flex items-start gap-4">
+                            <input 
+                              type="checkbox" 
+                              checked={selections.addons[a.id as keyof typeof selections.addons]}
+                              onChange={() => toggleAddon(a.id)}
+                              className="mt-1 w-4 h-4 accent-amber"
+                            />
+                            <div>
+                              <h4 className="text-sm font-bold text-charcoal uppercase tracking-wider">{a.name}</h4>
+                              <p className="text-[11px] text-muted">{a.desc}</p>
+                            </div>
+                          </div>
+                          <div className="text-sm font-serif text-timber font-medium">+€{a.price.toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => setStep(4)}
+                      className="w-full py-5 bg-timber text-cream text-[11px] font-bold uppercase tracking-widest hover:bg-charcoal transition-all"
+                    >
+                      See your quote →
+                    </button>
+                  </motion.div>
+                )}
+
+                {step === 4 && (
+                  <motion.div 
+                    key="step4"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="space-y-8"
+                  >
+                    {!submitted ? (
+                      <div className="space-y-8">
+                        <div>
+                          <h3 className="text-3xl font-serif text-charcoal mb-4">Your Obelisk</h3>
+                          <div className="bg-surface p-8 rounded-xl space-y-6">
+                            <div className="grid grid-cols-2 gap-8 text-[10px] uppercase tracking-widest font-bold">
+                              <div>
+                                <span className="text-muted block mb-3 opacity-60">Modules</span>
+                                <ul className="space-y-2">
+                                  {MODULE_DATA.map(m => selections.modules[m.id as keyof typeof selections.modules] && (
+                                    <li key={m.id} className="flex items-center text-timber">
+                                      <CheckCircle2 className="w-3 h-3 mr-2" /> {m.name}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div>
+                                <span className="text-muted block mb-3 opacity-60">Finish</span>
+                                <div className="text-timber">{FINISH_DATA.find(f => f.id === selections.finish)?.name}</div>
+                                <span className="text-muted block mb-3 mt-4 opacity-60">Add-ons</span>
+                                <ul className="space-y-2">
+                                  {ADDON_DATA.map(a => selections.addons[a.id as keyof typeof selections.addons] && (
+                                    <li key={a.id} className="flex items-center text-timber">
+                                      <CheckCircle2 className="w-3 h-3 mr-2" /> {a.name}
+                                    </li>
+                                  ))}
+                                  {Object.values(selections.addons).every(v => !v) && <li>None</li>}
+                                </ul>
+                              </div>
+                            </div>
+                            <div className="pt-6 border-t border-charcoal/10 flex justify-between items-baseline">
+                              <span className="text-[10px] uppercase tracking-widest font-bold text-muted">Estimated Total</span>
+                              <div className="text-right">
+                                <div className="text-3xl font-serif text-charcoal">€{total.toLocaleString()}</div>
+                                <div className="text-[10px] text-muted italic mt-1 uppercase tracking-tighter">€{range.min.toLocaleString()} — €{range.max.toLocaleString()}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <form onSubmit={handleQuoteSubmit} className="space-y-4">
+                          <input 
+                            required
+                            type="email"
+                            placeholder="Email address"
+                            className="w-full p-4 bg-cream border border-charcoal/10 focus:border-timber outline-none transition-colors"
+                            value={quoteInfo.email}
+                            onChange={e => setQuoteInfo(prev => ({ ...prev, email: e.target.value }))}
+                          />
+                          <select 
+                            className="w-full p-4 bg-cream border border-charcoal/10 focus:border-timber outline-none transition-colors text-charcoal"
+                            value={quoteInfo.country}
+                            onChange={e => setQuoteInfo(prev => ({ ...prev, country: e.target.value }))}
+                          >
+                            <option>Belgium</option>
+                            <option>Netherlands</option>
+                            <option>Germany</option>
+                            <option>Other EU</option>
+                          </select>
+                          <button type="submit" className="w-full py-5 bg-timber text-cream text-[11px] font-bold uppercase tracking-widest hover:bg-charcoal transition-all">
+                            Send me my quote
+                          </button>
+                        </form>
+                      </div>
+                    ) : (
+                      <div className="text-center py-20 bg-surface rounded-3xl">
+                        <CheckCircle2 className="w-16 h-16 text-amber mx-auto mb-8" />
+                        <h3 className="text-3xl font-serif mb-4">Quote sent</h3>
+                        <p className="text-muted max-w-sm mx-auto mb-10 leading-relaxed">
+                          We've routed your configuration to the nearest certified builder in {quoteInfo.country}. Expect a reply within 48 hours.
+                        </p>
+                        <button 
+                          onClick={() => {
+                            setSubmitted(false);
+                            setStep(1);
+                            setSelections({
+                              modules: { entrance: true, bathroom: true, kitchen: true, loft: false, deck: false },
+                              finish: 'warm',
+                              addons: { solar: false, greywater: false, heatpump: false, glazing: false }
+                            });
+                          }}
+                          className="text-amber uppercase tracking-widest text-[11px] font-bold hover:underline"
+                        >
+                          Configure another →
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Sticky Price Summary (Steps 1-3) */}
+            {step < 4 && (
+              <div className="mt-12 pt-8 border-t border-charcoal/10 sticky bottom-0 bg-cream pb-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-muted block mb-1">Estimated price</span>
+                    <motion.div 
+                      animate={{ color: priceFlash ? "#C0873B" : "#1C1C1A" }}
+                      className="text-4xl font-serif"
+                    >
+                      €{total.toLocaleString()}
+                    </motion.div>
+                    <div className="text-[10px] text-muted uppercase tracking-tighter mt-1 opacity-60">
+                      Range: €{range.min.toLocaleString()} — €{range.max.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="hidden sm:block text-right max-w-[140px]">
+                    <p className="text-[9px] text-muted italic leading-tight uppercase tracking-tighter">
+                      Final price set by your local builder. Includes EU VAT.
+                    </p>
+                  </div>
                 </div>
-             </div>
+              </div>
+            )}
           </div>
-        </Reveal>
 
-        <div className="mt-24">
-          <a href="#waitlist" className="inline-flex items-center justify-center px-12 py-5 bg-timber text-cream text-[13px] font-bold uppercase tracking-widest hover:bg-charcoal transition-all">
-            Open the configurator
-          </a>
         </div>
       </div>
     </section>
   );
 };
+
 
 const Pricing = () => {
   const tiers = [
@@ -601,7 +1020,7 @@ const PlacementSection = () => {
           <MapPin className="w-8 h-8 text-timber mb-6" />
           <h4 className="font-serif text-2xl mb-4">Wallonia Regional</h4>
           <p className="text-muted text-sm leading-relaxed">
-            Wallonia’s <em class="italic">habitation légère</em> status formally recognizes modular dwellings. Obelisk is engineered to exceed all regional standards for permanent residence.
+            Wallonia’s <em className="italic">habitation légère</em> status formally recognizes modular dwellings. Obelisk is engineered to exceed all regional standards for permanent residence.
           </p>
         </Reveal>
         <Reveal delay={0.2}>
@@ -823,7 +1242,7 @@ export default function App() {
       <ProblemSection />
       <ObeliskSection />
       <ModulesSection />
-      <ConfiguratorTeaser />
+      <Configurator />
       <Pricing />
       <PlacementSection />
       <StorySection />
